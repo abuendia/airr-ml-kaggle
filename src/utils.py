@@ -1,6 +1,8 @@
 import os
 import glob
 from typing import Iterator, Tuple, Union, Iterable, List
+from pathlib import Path
+from functools import lru_cache
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
@@ -9,6 +11,32 @@ import sys
 import itertools
 
 from sklearn.feature_extraction.text import TfidfVectorizer
+
+
+@lru_cache(maxsize=1)
+def get_repo_root() -> Path:
+    """Return the repository root directory.
+
+    Uses `pyproject.toml` as the primary marker. Falls back to `<this_file>/..`.
+    """
+    start = Path(__file__).resolve()
+    for parent in [start.parent, *start.parents]:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    # Fallback: this file lives under <repo>/src/utils.py
+    return start.parent.parent
+
+
+@lru_cache(maxsize=1)
+def get_challenge_data_root() -> Path:
+    """Return the sibling `challenge_data/` directory (repo_root/../challenge_data)."""
+    return get_repo_root().parent / "challenge_data"
+
+
+@lru_cache(maxsize=1)
+def get_results_root() -> Path:
+    """Return the results root directory under this repo (repo_root/src/results)."""
+    return get_repo_root() / "src" / "results"
 
 
 def _count_contiguous_kmers_in_sequence(seq: str, k: int) -> Counter:

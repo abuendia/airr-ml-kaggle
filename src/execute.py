@@ -5,10 +5,12 @@ import pandas as pd
 from joblib import Parallel, delayed
 from contextlib import redirect_stdout, redirect_stderr
 import traceback
+from pathlib import Path
 
 from model import ImmuneStatePredictor
 from utils import validate_dirs_and_files, save_tsv
 from utils import get_dataset_pairs, concatenate_output_files
+from utils import get_challenge_data_root, get_results_root
 
 
 def _train_predictor(predictor: ImmuneStatePredictor, train_dir: str):
@@ -173,19 +175,21 @@ if __name__ == "__main__":
     per_job_n_jobs = int(args.per_job_n_jobs)
     save_important_sequences = args.save_important_sequences
     device = args.device
-    train_datasets_dir = "/oak/stanford/groups/akundaje/abuen/kaggle/challenge_data/train_datasets/train_datasets"
-    test_datasets_dir = "/oak/stanford/groups/akundaje/abuen/kaggle/challenge_data/test_datasets/test_datasets"
-    results_dir = f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/{model_name}"
 
-    os.makedirs(results_dir, exist_ok=True)
-    train_test_dataset_pairs = get_dataset_pairs(train_datasets_dir, test_datasets_dir)
+    challenge_root = get_challenge_data_root()
+    train_datasets_dir = challenge_root / "train_datasets" / "train_datasets"
+    test_datasets_dir = challenge_root / "test_datasets" / "test_datasets"
+    results_dir = get_results_root() / model_name
+
+    os.makedirs(str(results_dir), exist_ok=True)
+    train_test_dataset_pairs = get_dataset_pairs(str(train_datasets_dir), str(test_datasets_dir))
 
     # Run each training dataset (and its mapped test dirs) in parallel.
     Parallel(n_jobs=parallel_jobs, backend="loky")(
         delayed(_run_dataset_job)(
             train_dir=train_dir,
             test_dirs=test_dirs,
-            out_dir=results_dir,
+            out_dir=str(results_dir),
             model_type=model_type,
             classifier_type=classifier_type,
             per_job_n_jobs=per_job_n_jobs,
@@ -194,4 +198,4 @@ if __name__ == "__main__":
         )
         for train_dir, test_dirs in train_test_dataset_pairs
     )
-    concatenate_output_files(results_dir)
+    concatenate_output_files(str(results_dir))

@@ -3,8 +3,10 @@ from sklearn.model_selection import KFold
 import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
-import os
 import argparse
+from pathlib import Path
+
+from utils import get_challenge_data_root, get_results_root
 
 
 train_to_test_dataset_mapping = {
@@ -19,10 +21,15 @@ train_to_test_dataset_mapping = {
 }
 
 def stacking_ensemble(train_dataset_name, kmer_model_name, vj_model_name):
-    orig_train_dataset_labels = f"/oak/stanford/groups/akundaje/abuen/kaggle/challenge_data/train_datasets/train_datasets/{train_dataset_name}/metadata.csv"
-    kmer_train_dataset_preds = f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/{kmer_model_name}/{train_dataset_name}_train_predictions.tsv"
-    vj_train_dataset_preds = f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/{vj_model_name}/{train_dataset_name}_train_predictions.tsv"
-    val_indices = f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/{kmer_model_name}/split_indices/{train_dataset_name}_val_indices.txt"
+    challenge_root = get_challenge_data_root()
+    results_root = get_results_root()
+
+    orig_train_dataset_labels = (
+        challenge_root / "train_datasets" / "train_datasets" / train_dataset_name / "metadata.csv"
+    )
+    kmer_train_dataset_preds = results_root / kmer_model_name / f"{train_dataset_name}_train_predictions.tsv"
+    vj_train_dataset_preds = results_root / vj_model_name / f"{train_dataset_name}_train_predictions.tsv"
+    val_indices = results_root / kmer_model_name / "split_indices" / f"{train_dataset_name}_val_indices.txt"
 
     kmer_train_dataset_preds = pd.read_csv(kmer_train_dataset_preds, sep="\t")
     vj_train_dataset_preds = pd.read_csv(vj_train_dataset_preds, sep="\t")
@@ -78,8 +85,8 @@ def stacking_ensemble(train_dataset_name, kmer_model_name, vj_model_name):
     meta = LogisticRegression(penalty='l2', solver='liblinear', max_iter=10000)
     meta.fit(X_meta, y_meta)
 
-    kmer_test_dataset_preds = f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/{kmer_model_name}/{train_dataset_name}_test_predictions.tsv"
-    vj_test_dataset_preds = f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/{vj_model_name}/{train_dataset_name}_test_predictions.tsv"
+    kmer_test_dataset_preds = results_root / kmer_model_name / f"{train_dataset_name}_test_predictions.tsv"
+    vj_test_dataset_preds = results_root / vj_model_name / f"{train_dataset_name}_test_predictions.tsv"
     # run through meta model
     kmer_test_dataset_preds = pd.read_csv(kmer_test_dataset_preds, sep="\t")
     vj_test_dataset_preds = pd.read_csv(vj_test_dataset_preds, sep="\t")
@@ -91,15 +98,20 @@ def stacking_ensemble(train_dataset_name, kmer_model_name, vj_model_name):
         "dataset": train_dataset_name,
         "label_positive_probability": y_test_pred
     })
-    output_dir = f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/ensemble/"
-    os.makedirs(output_dir, exist_ok=True)
-    test_dataset_preds.to_csv(f"{output_dir}/{train_dataset_name}_test_predictions.tsv", sep="\t", index=False)
+    output_dir = results_root / "ensemble"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    test_dataset_preds.to_csv(output_dir / f"{train_dataset_name}_test_predictions.tsv", sep="\t", index=False)
 
 def linear_weighted_ensemble(train_dataset_name, kmer_model_name, vj_model_name):
-    orig_train_dataset_labels = f"/oak/stanford/groups/akundaje/abuen/kaggle/challenge_data/train_datasets/train_datasets/{train_dataset_name}/metadata.csv"
-    kmer_train_dataset_preds = f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/{kmer_model_name}/{train_dataset_name}_train_predictions.tsv"
-    vj_train_dataset_preds = f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/{vj_model_name}/{train_dataset_name}_train_predictions.tsv"
-    val_indices = f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/{kmer_model_name}/split_indices/{train_dataset_name}_val_indices.txt"
+    challenge_root = get_challenge_data_root()
+    results_root = get_results_root()
+
+    orig_train_dataset_labels = (
+        challenge_root / "train_datasets" / "train_datasets" / train_dataset_name / "metadata.csv"
+    )
+    kmer_train_dataset_preds = results_root / kmer_model_name / f"{train_dataset_name}_train_predictions.tsv"
+    vj_train_dataset_preds = results_root / vj_model_name / f"{train_dataset_name}_train_predictions.tsv"
+    val_indices = results_root / kmer_model_name / "split_indices" / f"{train_dataset_name}_val_indices.txt"
 
     kmer_train_dataset_preds = pd.read_csv(kmer_train_dataset_preds, sep="\t")
     vj_train_dataset_preds = pd.read_csv(vj_train_dataset_preds, sep="\t")
@@ -130,8 +142,12 @@ def linear_weighted_ensemble(train_dataset_name, kmer_model_name, vj_model_name)
     print()
 
     # inference on test set
-    kmer_test_dataset_preds = pd.read_csv(f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/{kmer_model_name}/{train_dataset_name}_test_predictions.tsv", sep="\t")
-    vj_test_dataset_preds = pd.read_csv(f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/{vj_model_name}/{train_dataset_name}_test_predictions.tsv", sep="\t")
+    kmer_test_dataset_preds = pd.read_csv(
+        results_root / kmer_model_name / f"{train_dataset_name}_test_predictions.tsv", sep="\t"
+    )
+    vj_test_dataset_preds = pd.read_csv(
+        results_root / vj_model_name / f"{train_dataset_name}_test_predictions.tsv", sep="\t"
+    )
     p_ensemble = best_alpha * kmer_test_dataset_preds["label_positive_probability"] + (1 - best_alpha) * vj_test_dataset_preds["label_positive_probability"]
 
     test_dataset_preds = pd.DataFrame({
@@ -139,9 +155,9 @@ def linear_weighted_ensemble(train_dataset_name, kmer_model_name, vj_model_name)
         "dataset": train_dataset_name,
         "label_positive_probability": p_ensemble
     })
-    output_dir = f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/ensemble/"
-    os.makedirs(output_dir, exist_ok=True)
-    test_dataset_preds.to_csv(f"{output_dir}/{train_dataset_name}_test_predictions.tsv", sep="\t", index=False)
+    output_dir = results_root / "ensemble"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    test_dataset_preds.to_csv(output_dir / f"{train_dataset_name}_test_predictions.tsv", sep="\t", index=False)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Stacking Ensemble of kmer and VJ models")
