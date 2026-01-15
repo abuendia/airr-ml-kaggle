@@ -31,7 +31,7 @@ def main(args):
 
     # top 50,000 sequence predictions
     pred_prob_df = sample_submission_df.head(num_preds)
-    feat_importance_dir = f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/log-reg/results/{args.feat_importance_model}"
+    feat_importance_dir = f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/{args.feat_importance_model}"
     col = []
     for dataset in train_datasets:
         feat_imp_path = f"{feat_importance_dir}/{dataset}_important_sequences.tsv"
@@ -41,13 +41,13 @@ def main(args):
 
     # concat
     final_df = pd.concat([pred_prob_df, all_important_seqs_df], axis=0)
-    final_df.to_csv("/oak/stanford/groups/akundaje/abuen/kaggle/tcr-repertoire/log-reg/results/ensemble/concat_with_importance.csv", sep=",", index=False)
+    final_df.to_csv("/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/ensemble/concat_with_importance.csv", sep=",", index=False)
     final_df.to_csv(f"{args.input_dir}/{args.submission_name}.csv", index=False)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Write kaggle submission file")
-    parser.add_argument("--input_dir", type=str, default='/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/log-reg/results/ensemble', help="Directory containing ensemble predictions")
+    parser.add_argument("--input_dir", type=str, default='/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/ensemble', help="Directory containing ensemble predictions")
     parser.add_argument("--feat_importance_model", type=str, default='4mer-logreg', help="Model name used for feature importance sequences")
     parser.add_argument("--submission_name", type=str, default='ensembled_preds', help="Name of the submission file")
     args = parser.parse_args()

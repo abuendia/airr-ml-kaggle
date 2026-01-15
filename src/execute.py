@@ -175,7 +175,7 @@ if __name__ == "__main__":
     device = args.device
     train_datasets_dir = "/oak/stanford/groups/akundaje/abuen/kaggle/challenge_data/train_datasets/train_datasets"
     test_datasets_dir = "/oak/stanford/groups/akundaje/abuen/kaggle/challenge_data/test_datasets/test_datasets"
-    results_dir = f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/log-reg/results/{model_name}"
+    results_dir = f"/oak/stanford/groups/akundaje/abuen/kaggle/airr-ml-kaggle/src/results/{model_name}"
 
     os.makedirs(results_dir, exist_ok=True)
     train_test_dataset_pairs = get_dataset_pairs(train_datasets_dir, test_datasets_dir)
