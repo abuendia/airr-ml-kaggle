@@ -8,8 +8,8 @@ The project can also be run through docker container as:
 
 ## Code
 
-Code for the solution is in [src](./src). To run the end-to-end workflow, run the bash script
-[run.sh](./src/run.sh). This includes the following modeling components:
+Code for the solution is in [src](./src). To run the end-to-end workflow, run the bash script as 
+`bash src/run.sh`. This approach includes the following modeling components:
 
 1. Gapped k-mer logistic regression
 

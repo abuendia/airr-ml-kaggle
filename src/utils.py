@@ -17,11 +17,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 def get_repo_root() -> Path:
     """Return the repository root directory.
 
-    Uses `pyproject.toml` as the primary marker. Falls back to `<this_file>/..`.
+    Uses `requirements.txt` as the primary marker. Falls back to `<this_file>/..`.
     """
     start = Path(__file__).resolve()
     for parent in [start.parent, *start.parents]:
-        if (parent / "pyproject.toml").exists():
+        if (parent / "requirements.txt").exists():
             return parent
     # Fallback: this file lives under <repo>/src/utils.py
     return start.parent.parent
@@ -29,8 +29,8 @@ def get_repo_root() -> Path:
 
 @lru_cache(maxsize=1)
 def get_challenge_data_root() -> Path:
-    """Return the sibling `challenge_data/` directory (repo_root/../challenge_data)."""
-    return get_repo_root().parent / "challenge_data"
+    """Return the sibling `challenge_data/` directory (repo_root/challenge_data)."""
+    return get_repo_root() / "challenge_data"
 
 
 @lru_cache(maxsize=1)
