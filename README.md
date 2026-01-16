@@ -30,7 +30,7 @@ Code for the solution is in [src](./src). To run the end-to-end workflow, run th
 2. Logistic regression on v and j gene counts
 
     We train a logistic regression model on counts for v-gene and j-gene identities. This is a simple mapping
-    of each v and j gene identity to its frequency in the training set.
+    of each v- and j-gene identity to its frequency in the training set.
 
 3. Ensembled meta-learner for k-mer and v, j gene models
 
@@ -41,5 +41,5 @@ Code for the solution is in [src](./src). To run the end-to-end workflow, run th
 
 4. Top 50,000 sequences per dataset
 
-    To predict the top 50,000 most influential sequences, we take the coefficients from the kmer model in step 1,
+    To predict the top 50,000 most influential sequences, we take the coefficients from the k-mer model in step 1,
     and rank sequences by descending absolute value. We do not incorporate the v, j gene model.
