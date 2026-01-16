@@ -35,9 +35,9 @@ Code for the solution is in [src](./src). To run the end-to-end workflow, run th
 3. Ensembled meta-learner for k-mer and v, j gene models
 
     For steps 1 and 2, we hold out a random 20% of patients as a validation set. We then use the predictions 
-    for these patients to ensemble the probabilities from the models from 1 and 2. This is done by simply 
-    linearly iterpolating probabilities as `alpha * p_1 + (1 - alpha) * p_2` where `alpha` is swept from 
-    0 to 1 at increments of 0.1.
+    for these patients to ensemble the probabilities from the models from 1 and 2. This is done by linearly 
+    iterpolating probabilities as `alpha * p_1 + (1 - alpha) * p_2` where `alpha` is swept from 0 to 1 at 
+    increments of 0.1.
 
 4. Top 50,000 sequences per dataset
 
