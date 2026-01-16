@@ -12,7 +12,7 @@ The project can also be run through docker as:
     docker pull abuendia2/airr-ml-kaggle:latest
     docker run --rm -v $(pwd)/adaptive_immune_challenge:/app/challenge_data  airr-challenge-app
 
-For mounting, the challenge dataset is under `(pwd)/adaptive_immune_challenge`, e.g. 
+For the mount, the challenge dataset is assumed to be at `(pwd)/adaptive_immune_challenge`, e.g. 
 `(pwd)/adaptive_immune_challenge/train_datasets/train_datasets/train_dataset_1` and 
 `(pwd)/adaptive_immune_challenge/test_datasets/test_datasets/test_dataset_1`.
 
