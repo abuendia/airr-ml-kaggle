@@ -3,7 +3,8 @@ import numpy as np
 import itertools
 from tqdm import tqdm
 import os
-import torch
+from pathlib import Path
+from typing import Optional
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold
@@ -46,8 +47,8 @@ class KmerClassifier:
         return Pipeline([
             ('scaler', StandardScaler()),
             ('classifier', LogisticRegression(
-                penalty='l1', C=C, solver='liblinear',
-                random_state=self.random_state, max_iter=10000
+                l1_ratio=1, C=C, solver='liblinear',
+                random_state=self.random_state, max_iter=1000
             ))
         ])
 
@@ -238,7 +239,7 @@ class ImmuneStatePredictor:
             n_jobs: int = 1,
             model_type: str = 'kmer',
             classifier_type: str = 'logistic',
-            device: str = 'cpu', **kwargs
+            **kwargs
         ):
         """
         Initializes the predictor.
@@ -252,15 +253,37 @@ class ImmuneStatePredictor:
         
         self.model_type = model_type
         self.classifier_type = classifier_type
-        self.device = device
-
-        if device == 'cuda' and not torch.cuda.is_available():
-            print("Warning: 'cuda' was requested but is not available. Falling back to 'cpu'.")
-            self.device = 'cpu'
-        else:
-            self.device = device
         self.model = None
         self.important_sequences_ = None
+        self._train_dir_path_resolved: Optional[str] = None
+        self._train_encoded_features_df: Optional[pd.DataFrame] = None
+
+    def _predict_proba_from_features_df(self, X_features_df: pd.DataFrame, *, dataset_name: str) -> pd.DataFrame:
+        """Predict probabilities from an already-encoded feature matrix.
+
+        This avoids re-loading and re-encoding raw repertoires.
+        """
+        if self.model is None:
+            raise RuntimeError("The model has not been fitted yet. Please call `fit` first.")
+
+        if self.model.feature_names_ is not None:
+            X_features_df = X_features_df.reindex(columns=self.model.feature_names_, fill_value=0)
+
+        repertoire_ids = X_features_df.index.tolist()
+        probabilities = self.model.predict_proba(X_features_df)
+        predictions_df = pd.DataFrame({
+            'ID': repertoire_ids,
+            'dataset': [dataset_name] * len(repertoire_ids),
+            'label_positive_probability': probabilities
+        })
+
+        # to enable compatibility with the expected output format that includes junction_aa, v_call, j_call columns
+        predictions_df['junction_aa'] = -999.0
+        predictions_df['v_call'] = -999.0
+        predictions_df['j_call'] = -999.0
+
+        predictions_df = predictions_df[['ID', 'dataset', 'label_positive_probability', 'junction_aa', 'v_call', 'j_call']]
+        return predictions_df
 
     def fit(self, train_dir_path: str):
         """
@@ -274,10 +297,17 @@ class ImmuneStatePredictor:
         """
         if self.model_type == 'kmer':
             X_train_df, y_train_df = load_and_encode_kmers(train_dir_path) # Example of loading and encoding kmers
+            c_values = [1e-3, 3e-3, 1e-2, 3e-2, 1e-1]
         elif self.model_type == 'vj':
             X_train_df, y_train_df = load_and_encode_v_and_j_genes(train_dir_path)
+            c_values = [1, 0.2, 0.1, 0.05, 0.03]
         else:
             raise ValueError(f"Unknown model type: {self.model_type}")
+
+        # Cache the expensive encodings so that callers can generate train-set predictions
+        # without re-encoding the same directory.
+        self._train_dir_path_resolved = str(Path(train_dir_path).resolve())
+        self._train_encoded_features_df = X_train_df
 
         X_train, y_train, train_ids = prepare_data(X_train_df, y_train_df,
                                                    id_col='ID', label_col='label_positive')
@@ -285,7 +315,7 @@ class ImmuneStatePredictor:
         # Select classifier based on type
         if self.classifier_type == 'logistic':
             self.model = KmerClassifier(
-                c_values=[1e-3, 3e-3, 1e-2, 3e-2, 1e-1],
+                c_values=c_values,
                 cv_folds=5,
                 opt_metric='roc_auc',
                 random_state=123,
@@ -299,6 +329,20 @@ class ImmuneStatePredictor:
         self.train_ids_ = train_ids
         print("Training complete.")
         return self
+
+    def predict_proba_train(self) -> pd.DataFrame:
+        """Predict probabilities on the training directory without re-encoding."""
+        if self._train_dir_path_resolved is None or self._train_encoded_features_df is None:
+            raise RuntimeError("No cached training encodings found. Call `fit(train_dir_path)` first.")
+
+        dataset_name = os.path.basename(self._train_dir_path_resolved.rstrip(os.sep))
+        print(f"Making predictions for cached training data ({dataset_name})...")
+        predictions_df = self._predict_proba_from_features_df(
+            self._train_encoded_features_df,
+            dataset_name=dataset_name,
+        )
+        print(f"Prediction complete on {len(predictions_df)} training examples.")
+        return predictions_df
 
     def predict_proba(self, test_dir_path: str) -> pd.DataFrame:
         """
@@ -314,32 +358,28 @@ class ImmuneStatePredictor:
         if self.model is None:
             raise RuntimeError("The model has not been fitted yet. Please call `fit` first.")
 
-        if self.model_type == 'kmer':
-            X_test_df, _ = load_and_encode_kmers(test_dir_path)
-        elif self.model_type == 'vj':
-            X_test_df, _ = load_and_encode_v_and_j_genes(test_dir_path)
+        resolved_test_dir = str(Path(test_dir_path).resolve())
+        if (
+            self._train_dir_path_resolved is not None
+            and self._train_encoded_features_df is not None
+            and resolved_test_dir == self._train_dir_path_resolved
+        ):
+            print("Reusing cached train-set encodings (no re-encoding).")
+            X_test_df = self._train_encoded_features_df
         else:
-            raise ValueError(f"Unknown model type: {self.model_type}")
+            if self.model_type == 'kmer':
+                X_test_df, _ = load_and_encode_kmers(test_dir_path)
+            elif self.model_type == 'vj':
+                X_test_df, _ = load_and_encode_v_and_j_genes(test_dir_path)
+            else:
+                raise ValueError(f"Unknown model type: {self.model_type}")
 
-        if self.model.feature_names_ is not None:
-            X_test_df = X_test_df.reindex(columns=self.model.feature_names_, fill_value=0)
+        predictions_df = self._predict_proba_from_features_df(
+            X_test_df,
+            dataset_name=os.path.basename(test_dir_path),
+        )
 
-        repertoire_ids = X_test_df.index.tolist()
-        probabilities = self.model.predict_proba(X_test_df)
-        predictions_df = pd.DataFrame({
-            'ID': repertoire_ids,
-            'dataset': [os.path.basename(test_dir_path)] * len(repertoire_ids),
-            'label_positive_probability': probabilities
-        })
-
-        # to enable compatibility with the expected output format that includes junction_aa, v_call, j_call columns
-        predictions_df['junction_aa'] = -999.0
-        predictions_df['v_call'] = -999.0
-        predictions_df['j_call'] = -999.0
-
-        predictions_df = predictions_df[['ID', 'dataset', 'label_positive_probability', 'junction_aa', 'v_call', 'j_call']]
-
-        print(f"Prediction complete on {len(repertoire_ids)} examples in {test_dir_path}.")
+        print(f"Prediction complete on {len(predictions_df)} examples in {test_dir_path}.")
         return predictions_df
 
     def identify_associated_sequences(self, train_dir_path: str, top_k: int = 50000) -> pd.DataFrame:

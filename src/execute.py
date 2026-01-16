@@ -87,7 +87,6 @@ def main(
         test_dirs: List[str], 
         out_dir: str, 
         n_jobs: int, 
-        device: str, 
         model_type: str, 
         classifier_type: str,
         save_important_sequences: bool
@@ -95,18 +94,17 @@ def main(
     validate_dirs_and_files(train_dir, test_dirs, out_dir)
     predictor = ImmuneStatePredictor(
         n_jobs=n_jobs,
-        device=device,
         model_type=model_type,
         classifier_type=classifier_type,
     )
     _train_predictor(predictor, train_dir)
     _save_val_indices_and_performance(predictor, out_dir, train_dir)
-    train_predictions = _generate_predictions(predictor, [train_dir])
+    train_predictions = predictor.predict_proba(train_dir)
     _save_predictions(train_predictions, out_dir, train_dir, is_train_set=True)
-    # if save_important_sequences:
-    #     _save_important_sequences(predictor, out_dir, train_dir)
-    # test_predictions = _generate_predictions(predictor, test_dirs)
-    # _save_predictions(test_predictions, out_dir, train_dir, is_train_set=False)
+    if save_important_sequences:
+        _save_important_sequences(predictor, out_dir, train_dir)
+    test_predictions = _generate_predictions(predictor, test_dirs)
+    _save_predictions(test_predictions, out_dir, train_dir, is_train_set=False)
 
 
 def _run_dataset_job(
@@ -117,7 +115,6 @@ def _run_dataset_job(
         classifier_type: str, 
         per_job_n_jobs: int, 
         save_important_sequences: bool, 
-        device: str
     ) -> None:
     """Wrapper for running one train dataset end-to-end (train, predict, write outputs).
 
@@ -135,7 +132,6 @@ def _run_dataset_job(
         print(f"model_type: {model_type}")
         print(f"classifier_type: {classifier_type}")
         print(f"per_job_n_jobs: {per_job_n_jobs}")
-        print(f"device: {device}")
         print(f"pid: {os.getpid()}")
         print("=== Running ===")
         try:
@@ -147,7 +143,6 @@ def _run_dataset_job(
                 model_type=model_type,
                 classifier_type=classifier_type,
                 save_important_sequences=save_important_sequences,
-                device=device,
             )
             print(f"=== Dataset job complete: {dataset_id} ===")
         except Exception:
@@ -165,7 +160,6 @@ if __name__ == "__main__":
     parser.add_argument("--parallel_jobs", type=int, default=8, help="Number of datasets to run in parallel (default: 8).")
     parser.add_argument("--per_job_n_jobs", type=int, default=4, help="CPU cores to use within each dataset job.")
     parser.add_argument("--save_important_sequences", action='store_true', help="Whether to save important sequences.")
-    parser.add_argument("--device", type=str, default='gpu', help="Device to use (e.g. 'cpu', 'gpu', 'cuda').")
     args = parser.parse_args()
 
     model_name = args.model_name
@@ -174,7 +168,6 @@ if __name__ == "__main__":
     parallel_jobs = int(args.parallel_jobs)
     per_job_n_jobs = int(args.per_job_n_jobs)
     save_important_sequences = args.save_important_sequences
-    device = args.device
 
     challenge_root = get_challenge_data_root()
     train_datasets_dir = challenge_root / "train_datasets" / "train_datasets"
@@ -194,7 +187,6 @@ if __name__ == "__main__":
             classifier_type=classifier_type,
             per_job_n_jobs=per_job_n_jobs,
             save_important_sequences=save_important_sequences,
-            device=device,
         )
         for train_dir, test_dirs in train_test_dataset_pairs
     )

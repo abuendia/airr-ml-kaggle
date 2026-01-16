@@ -50,7 +50,6 @@ def main(args):
     # concat
     final_df = pd.concat([pred_prob_df, all_important_seqs_df], axis=0)
     ensemble_dir.mkdir(parents=True, exist_ok=True)
-    final_df.to_csv(ensemble_dir / "concat_with_importance.csv", sep=",", index=False)
     final_df.to_csv(ensemble_dir / f"{args.submission_name}.csv", index=False)
 
 

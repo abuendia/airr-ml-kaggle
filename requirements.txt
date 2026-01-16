@@ -1,3 +1,5 @@
+kaggle
 numpy
 pandas
 scikit-learn
+tqdm

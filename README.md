@@ -2,9 +2,18 @@
 
 ## Dependencies
 
-The project's dependencies can be installed from the current directory by running `pip install -e`. 
+The project's dependencies can be installed from the current directory by running
 
-The project can also be run through docker container as:
+    pip install -r requirements.txt
+
+The project can also be run through docker (downloading from Docker Hub) as:
+
+    docker pull abuendia2/airr-ml-kaggle:latest
+    docker run --rm -v $(pwd)/adaptive_immune_challenge:/app/challenge_data  airr-challenge-app
+
+For mounting, the challenge dataset is under `(pwd)/adaptive_immune_challenge`, e.g. 
+`(pwd)/adaptive_immune_challenge/train_datasets/train_datasets/train_dataset_1` and 
+`(pwd)/adaptive_immune_challenge/test_datasets/test_datasets/test_dataset_1`.
 
 ## Code
 
@@ -25,11 +34,11 @@ Code for the solution is in [src](./src). To run the end-to-end workflow, run th
 3. Ensembled meta-learner for k-mer and v, j gene models
 
     For steps 1 and 2, we hold out a random 20% of patients as a validation set. We then use the predictions 
-    for these patients to ensemble the probabilities from the models from 1 and 2. We train a meta-learner
-    logistic regression using 4-fold cross validation on the validation set. The meta-learner is used to produce
-    the final predictions.
+    for these patients to ensemble the probabilities from the models from 1 and 2. This is done by simply 
+    linearly iterpolating probabilities as `alpha * p_1 + (1 - alpha) * p_2` where `alpha` is swept from 
+    0 to 1 at increments of 0.1.
 
 4. Top 50,000 sequences per dataset
 
-    To predict the top 50,000 most influential sequences, we simply take the coefficients from the model in step 1,
+    To predict the top 50,000 most influential sequences, we take the coefficients from the kmer model in step 1,
     and rank sequences by descending absolute value. We do not incorporate the v, j gene model.

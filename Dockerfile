@@ -5,6 +5,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src .
+COPY src ./src
 
 CMD ["bash", "src/run.sh"]

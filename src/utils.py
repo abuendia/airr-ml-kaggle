@@ -328,8 +328,7 @@ def load_and_encode_kmers(
 
 def load_and_encode_v_and_j_genes(data_dir: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Loading and encoding of repertoire data with V gene counts, J gene counts,
-    and (V,J) gene-pair counts.
+    Loading and k-mer encoding of repertoire data with v and j genes.
     """
     metadata_path = os.path.join(data_dir, 'metadata.csv')
     data_loader = load_data_generator(data_dir=data_dir)
@@ -348,37 +347,13 @@ def load_and_encode_v_and_j_genes(data_dir: str) -> Tuple[pd.DataFrame, pd.DataF
             rep_id = os.path.basename(filename).replace(".tsv", "")
             label = None
 
-        v_counts = build_v_gene_dict(data_df)
-        j_counts = build_j_gene_dict(data_df)
-        vj_counts = build_vj_gene_pair_dict(data_df)
-
-        # convert into percentages
-        total_counts = sum(vj_counts.values())
-        for key in vj_counts:
-            vj_counts[key] = vj_counts[key] / total_counts if total_counts > 0 else 0.0
-
-        total_v_counts = sum(v_counts.values())
-        for key in v_counts:
-            v_counts[key] = v_counts[key] / total_v_counts if total_v_counts > 0 else 0.0
-        total_j_counts = sum(j_counts.values())
-        for key in j_counts:
-            j_counts[key] = j_counts[key] / total_j_counts if total_j_counts > 0 else 0.0
-
-        # get rid of things that are less than 0.10 frequency
-        for key in list(v_counts.keys()):
-            if v_counts[key] < 0.01:
-                del v_counts[key]
-        for key in list(j_counts.keys()):
-            if j_counts[key] < 0.01:
-                del j_counts[key]
-        for key in list(vj_counts.keys()):
-            if vj_counts[key] < 0.01:
-                del vj_counts[key]
+        v_gene_counts = build_v_gene_dict(data_df)
+        j_gene_counts = build_j_gene_dict(data_df)
 
         vj_features.append({
             'ID': rep_id,
-            **v_counts,
-            **j_counts,
+            **v_gene_counts,
+            **j_gene_counts,
         })
 
         metadata_record = {'ID': rep_id}
@@ -386,7 +361,7 @@ def load_and_encode_v_and_j_genes(data_dir: str) -> Tuple[pd.DataFrame, pd.DataF
             metadata_record['label_positive'] = label
         metadata_records.append(metadata_record)
 
-        del data_df
+        del data_df, v_gene_counts, j_gene_counts
 
     features_df = pd.DataFrame(vj_features).fillna(0).set_index('ID')
     features_df.fillna(0)
@@ -407,23 +382,6 @@ def build_j_gene_dict(data_df: pd.DataFrame):
     for j_gene in data_df['j_call'].dropna():
         j_gene_counts[j_gene] += 1
     return j_gene_counts
-
-
-def build_vj_gene_pair_dict(data_df: pd.DataFrame, prefix: str = 'VJ__'):
-    """Count (v_call, j_call) co-occurrences as additional features.
-
-    Feature names are stored as strings with a prefix to avoid colliding with
-    raw V and J gene feature names.
-    """
-    vj_counts = Counter()
-    if 'v_call' not in data_df.columns or 'j_call' not in data_df.columns:
-        return vj_counts
-
-    for v_gene, j_gene in zip(data_df['v_call'], data_df['j_call']):
-        if pd.isna(v_gene) or pd.isna(j_gene):
-            continue
-        vj_counts[f"{prefix}{v_gene}__{j_gene}"] += 1
-    return vj_counts
 
 
 def save_tsv(df: pd.DataFrame, path: str):

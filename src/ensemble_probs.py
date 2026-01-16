@@ -166,4 +166,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     for train_dataset_name, test_dataset_names in train_to_test_dataset_mapping.items():
-        stacking_ensemble(train_dataset_name, args.kmer_model_name, args.vj_model_name)
+        linear_weighted_ensemble(train_dataset_name, args.kmer_model_name, args.vj_model_name)
