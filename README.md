@@ -21,8 +21,7 @@ locally or in the container).
 
 ## Workflow
 
-Code for the solution is in [src](./src). To run the end-to-end workflow, run the bash script as 
-`bash src/run.sh`. This approach includes the following modeling components:
+Code for the solution is in [src](./src). This approach includes the following modeling components:
 
 1. Gapped k-mer logistic regression
 
