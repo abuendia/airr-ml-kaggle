@@ -3,7 +3,7 @@ import pandas as pd
 import argparse
 from pathlib import Path
 
-from utils import get_challenge_data_root, get_results_root, get_repo_root
+from utils import get_results_root, get_repo_root
 
 
 def main(args):
@@ -21,7 +21,7 @@ def main(args):
         preds.append(test_dataset_preds)
     combined_preds = pd.concat(preds)
 
-    sample_submission = get_challenge_data_root() / "sample_submissions.csv"
+    sample_submission = repo_root / "sample_submission.csv"
     sample_submission_df = pd.read_csv(sample_submission)
 
     # label_positive_probability predictions
