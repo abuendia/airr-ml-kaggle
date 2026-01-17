@@ -16,6 +16,9 @@ For the mount, the challenge dataset is assumed to be at `(pwd)/adaptive_immune_
 `(pwd)/adaptive_immune_challenge/train_datasets/train_datasets/train_dataset_1` and 
 `(pwd)/adaptive_immune_challenge/test_datasets/test_datasets/test_dataset_1`.
 
+The final submission file is written to `src/results/ensemble/4mer-vj-logreg-ensemble.csv` (either 
+locally or in the container).
+
 ## Code
 
 Code for the solution is in [src](./src). To run the end-to-end workflow, run the bash script as 
