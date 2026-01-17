@@ -1,6 +1,6 @@
 # AIRR-ML-25: Solution for Adaptive Immune Profiling Challenge
 
-## Dependencies
+## Dependencies and running the solution
 
 The project's dependencies and main script can be installed and run from the current directory as:
 
@@ -19,7 +19,7 @@ For the mount, the challenge dataset is assumed to be at `(pwd)/adaptive_immune_
 The final submission file is written to `src/results/ensemble/4mer-vj-logreg-ensemble.csv` (either 
 locally or in the container).
 
-## Code
+## Workflow
 
 Code for the solution is in [src](./src). To run the end-to-end workflow, run the bash script as 
 `bash src/run.sh`. This approach includes the following modeling components:
