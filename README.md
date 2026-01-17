@@ -10,7 +10,7 @@ The project's dependencies and main script can be installed and run from the cur
 The project can also be run through docker as:
 
     docker pull abuendia2/airr-ml-kaggle:latest
-    docker run --rm -v $(pwd)/adaptive_immune_challenge:/app/challenge_data airr-challenge-app
+    docker run -v $(pwd)/adaptive_immune_challenge:/app/challenge_data abuendia2/airr-ml-kaggle:latest
 
 For the mount, the challenge dataset is assumed to be at `(pwd)/adaptive_immune_challenge`, e.g. 
 `(pwd)/adaptive_immune_challenge/train_datasets/train_datasets/train_dataset_1` and 
