@@ -4,9 +4,8 @@
 
 ## Dependencies
 
-The sample submission CSVs, which define the required output rows and order,
-are stored with Git LFS. Install Git LFS before cloning or fetching the
-repository. One way to create the environment is:
+The sample submission CSVs, which define the required output rows and order, are stored with Git LFS. Install Git LFS before cloning or fetching the
+repository. Create the conda env:
 
     conda create -n kaggle python==3.11
     conda activate kaggle
@@ -26,12 +25,11 @@ Install the Python dependencies from the repository root:
 
     pip install -r requirements.txt
 
-### Running the solution
+## Running the solution
 
 The runner supports both dataset releases (Phases 1 and 2). Their repertoire
 files use different formats: Phase 1 uses `.tsv`, while Phase 2 uses compressed
-`.tsv.gz` files.
-Phase 1 contains 8 mapped training datasets and 11 test directories; Phase 2
+`.tsv.gz` files. Phase 1 contains 8 mapped training datasets and 11 test directories; Phase 2
 contains 95 mapped training datasets and 95 test directories. Test directories
 such as `test_dataset_7_1` and `test_dataset_7_2` are automatically associated
 with `train_dataset_7`.
@@ -74,7 +72,7 @@ To run Phase 1, mount its directory and override the default command:
         -v $(pwd)/AIRR_ML_25_Phase1_data:/app/AIRR_ML_25_Phase1_data \
         airr-ml-kaggle bash src/run.sh AIRR_ML_25_Phase1_data
 
-## Analysis workflow
+## Modeling workflow
 
 Code for the solution is in [src](./src). This approach includes the following modeling components:
 
