@@ -1,3 +1,6 @@
+# System dependency: git-lfs
+# With Conda: conda install -c conda-forge git-lfs
+joblib
 kaggle
 numpy
 pandas

@@ -1,6 +1,6 @@
 import os
 import glob
-from typing import Iterator, Tuple, Union, Iterable, List
+from typing import Iterator, Optional, Tuple, Union, Iterable, List
 from pathlib import Path
 from functools import lru_cache
 import pandas as pd
@@ -28,15 +28,46 @@ def get_repo_root() -> Path:
 
 
 @lru_cache(maxsize=1)
-def get_challenge_data_root() -> Path:
+def get_challenge_data_root(dataset: str) -> Path:
     """Return the sibling `challenge_data/` directory (repo_root/challenge_data)."""
-    return get_repo_root() / "challenge_data"
+    return get_repo_root() / dataset
 
 
 @lru_cache(maxsize=1)
-def get_results_root() -> Path:
-    """Return the results root directory under this repo (repo_root/src/results)."""
-    return get_repo_root() / "src" / "results"
+def get_results_root(dataset: str) -> Path:
+    """Return `<dataset>/results`, resolving relative datasets from the repo root."""
+    return get_repo_root() / dataset / "results"
+
+
+def get_train_to_test_dataset_mapping(dataset: str) -> dict:
+    """
+    Scans the train_datasets and test_datasets directories and matches
+    train_dataset_x to any test_dataset_x or test_dataset_x_* entries,
+    where x must be an exact match of the suffix after 'train_dataset_'.
+    """
+    challenge_root = get_challenge_data_root(dataset)
+    train_datasets_dir = challenge_root / "train_datasets"
+    test_datasets_dir = challenge_root / "test_datasets"
+    if not train_datasets_dir.is_dir():
+        raise FileNotFoundError(f"Train datasets directory does not exist: {train_datasets_dir}")
+    if not test_datasets_dir.is_dir():
+        raise FileNotFoundError(f"Test datasets directory does not exist: {test_datasets_dir}")
+
+    test_groups: dict = defaultdict(list)
+    for test_name in sorted(os.listdir(str(test_datasets_dir))):
+        if test_name.startswith("test_dataset_"):
+            base_id = test_name.replace("test_dataset_", "").split("_")[0]
+            test_groups[base_id].append(test_name)
+
+    mapping = {}
+    for train_name in sorted(os.listdir(str(train_datasets_dir))):
+        if train_name.startswith("train_dataset_"):
+            train_id = train_name.replace("train_dataset_", "")
+            matching = test_groups.get(train_id, [])
+            if matching:
+                mapping[train_name] = matching
+
+    return mapping
 
 
 def _count_contiguous_kmers_in_sequence(seq: str, k: int) -> Counter:
@@ -118,6 +149,22 @@ def _count_kmers_and_gapped_kmers_in_sequence(
     return counts
 
 
+def _glob_tsv_files(data_dir: str) -> list:
+    """Return a sorted list of all .tsv.gz and .tsv files in data_dir."""
+    gz_files = glob.glob(os.path.join(data_dir, '*.tsv.gz'))
+    tsv_files = glob.glob(os.path.join(data_dir, '*.tsv'))
+    return sorted(set(gz_files) | set(tsv_files))
+
+
+def _strip_tsv_extension(filename: str) -> str:
+    """Strip .tsv.gz or .tsv extension from a basename."""
+    if filename.endswith('.tsv.gz'):
+        return filename[:-len('.tsv.gz')]
+    if filename.endswith('.tsv'):
+        return filename[:-len('.tsv')]
+    return filename
+
+
 def load_and_encode_kmers_tfidf(
     data_dir: str,
     ngram_range=(3, 6),
@@ -137,7 +184,7 @@ def load_and_encode_kmers_tfidf(
             rep_id, data_df, label = item
         else:
             filename, data_df = item
-            rep_id = os.path.basename(filename).replace(".tsv", "")
+            rep_id = _strip_tsv_extension(os.path.basename(filename))
             label = None
 
         # concatenate all sequences into one "document"
@@ -203,9 +250,7 @@ def load_data_generator(data_dir: str, metadata_filename='metadata.csv') -> Iter
                 print(f"Warning: File '{row.filename}' listed in metadata not found. Skipping.")
                 continue
     else:
-        search_pattern = os.path.join(data_dir, '*.tsv')
-        tsv_files = glob.glob(search_pattern)
-        for file_path in sorted(tsv_files):
+        for file_path in _glob_tsv_files(data_dir):
             try:
                 filename = os.path.basename(file_path)
                 repertoire_df = pd.read_csv(file_path, sep='\t')
@@ -243,10 +288,9 @@ def load_full_dataset(data_dir: str) -> pd.DataFrame:
             data_df['label_positive'] = label
             df_list.append(data_df)
     else:
-        search_pattern = os.path.join(data_dir, '*.tsv')
-        total_files = len(glob.glob(search_pattern))
+        total_files = len(_glob_tsv_files(data_dir))
         for filename, data_df in tqdm(data_loader, total=total_files, desc="Loading files"):
-            data_df['ID'] = os.path.basename(filename).replace(".tsv", "")
+            data_df['ID'] = _strip_tsv_extension(os.path.basename(filename))
             df_list.append(data_df)
 
     if not df_list:
@@ -284,15 +328,14 @@ def load_and_encode_kmers(
     repertoire_features = []
     metadata_records = []
 
-    search_pattern = os.path.join(data_dir, '*.tsv')
-    total_files = len(glob.glob(search_pattern))
+    total_files = len(_glob_tsv_files(data_dir))
 
     for item in tqdm(data_loader, total=total_files, desc=f"Encoding {k}-mers"):
         if os.path.exists(metadata_path):
             rep_id, data_df, label = item
         else:
             filename, data_df = item
-            rep_id = os.path.basename(filename).replace(".tsv", "")
+            rep_id = _strip_tsv_extension(os.path.basename(filename))
             label = None
 
         kmer_counts = Counter()
@@ -336,15 +379,14 @@ def load_and_encode_v_and_j_genes(data_dir: str) -> Tuple[pd.DataFrame, pd.DataF
     vj_features = []
     metadata_records = []
 
-    search_pattern = os.path.join(data_dir, '*.tsv')
-    total_files = len(glob.glob(search_pattern))
+    total_files = len(_glob_tsv_files(data_dir))
 
     for item in tqdm(data_loader, total=total_files, desc="Encoding v and j genes"):
         if os.path.exists(metadata_path):
             rep_id, data_df, label = item
         else:
             filename, data_df = item
-            rep_id = os.path.basename(filename).replace(".tsv", "")
+            rep_id = _strip_tsv_extension(os.path.basename(filename))
             label = None
 
         v_gene_counts = build_v_gene_dict(data_df)
@@ -405,9 +447,8 @@ def get_repertoire_ids(data_dir: str) -> list:
         metadata_df = pd.read_csv(metadata_path)
         repertoire_ids = metadata_df['repertoire_id'].tolist()
     else:
-        search_pattern = os.path.join(data_dir, '*.tsv')
-        tsv_files = glob.glob(search_pattern)
-        repertoire_ids = [os.path.basename(f).replace('.tsv', '') for f in sorted(tsv_files)]
+        tsv_files = _glob_tsv_files(data_dir)
+        repertoire_ids = [_strip_tsv_extension(os.path.basename(f)) for f in tsv_files]
 
     return repertoire_ids
 
@@ -437,15 +478,17 @@ def generate_random_top_sequences_df(n_seq: int = 50000) -> pd.DataFrame:
 
 def validate_dirs_and_files(train_dir: str, test_dirs: List[str], out_dir: str) -> None:
     assert os.path.isdir(train_dir), f"Train directory `{train_dir}` does not exist."
+    train_tsv_gzs = glob.glob(os.path.join(train_dir, "*.tsv.gz"))
     train_tsvs = glob.glob(os.path.join(train_dir, "*.tsv"))
-    assert train_tsvs, f"No .tsv files found in train directory `{train_dir}`."
+    assert train_tsvs or train_tsv_gzs, f"No .tsv or .tsv.gz files found in train directory `{train_dir}`."
     metadata_path = os.path.join(train_dir, "metadata.csv")
     assert os.path.isfile(metadata_path), f"`metadata.csv` not found in train directory `{train_dir}`."
 
     for test_dir in test_dirs:
         assert os.path.isdir(test_dir), f"Test directory `{test_dir}` does not exist."
+        test_tsv_gzs = glob.glob(os.path.join(test_dir, "*.tsv.gz"))
         test_tsvs = glob.glob(os.path.join(test_dir, "*.tsv"))
-        assert test_tsvs, f"No .tsv files found in test directory `{test_dir}`."
+        assert test_tsvs or test_tsv_gzs, f"No .tsv or .tsv.gz files found in test directory `{test_dir}`."
 
     try:
         os.makedirs(out_dir, exist_ok=True)
@@ -458,25 +501,26 @@ def validate_dirs_and_files(train_dir: str, test_dirs: List[str], out_dir: str) 
         sys.exit(1)
 
 
-def concatenate_output_files(out_dir: str) -> None:
+def concatenate_output_files(
+    out_dir: str,
+    predictions_dir: Optional[str] = None,
+    sequences_dir: Optional[str] = None,
+) -> None:
     """
-    Concatenates all test predictions and important sequences TSV files from the output directory.
-
-    This function finds all files matching the patterns:
-    - *_test_predictions.tsv
-    - *_important_sequences.tsv
-
-    and concatenates them to match the expected output format of submissions.csv.
+    Concatenates test predictions and important sequences TSV files into submissions.csv.
 
     Args:
-        out_dir (str): Path to the output directory containing the TSV files.
-
-    Returns:
-        pd.DataFrame: Concatenated DataFrame with predictions followed by important sequences.
-                     Columns: ['ID', 'dataset', 'label_positive_probability', 'junction_aa', 'v_call', 'j_call']
+        out_dir: Directory where submissions.csv is written.
+        predictions_dir: Directory containing *_test_predictions.tsv files. Defaults to out_dir.
+        sequences_dir: Directory containing *_important_sequences.tsv files. Defaults to out_dir.
     """
-    predictions_pattern = os.path.join(out_dir, '*_test_predictions.tsv')
-    sequences_pattern = os.path.join(out_dir, '*_important_sequences.tsv')
+    if predictions_dir is None:
+        predictions_dir = out_dir
+    if sequences_dir is None:
+        sequences_dir = out_dir
+
+    predictions_pattern = os.path.join(predictions_dir, '*_test_predictions.tsv')
+    sequences_pattern = os.path.join(sequences_dir, '*_important_sequences.tsv')
 
     predictions_files = sorted(glob.glob(predictions_pattern))
     sequences_files = sorted(glob.glob(sequences_pattern))
@@ -499,30 +543,16 @@ def concatenate_output_files(out_dir: str) -> None:
             print(f"Warning: Could not read sequences file '{seq_file}'. Error: {e}. Skipping.")
             continue
 
+    output_columns = [
+        'ID', 'dataset', 'label_positive_probability',
+        'junction_aa', 'v_call', 'j_call',
+    ]
     if not df_list:
         print("Warning: No output files were found to concatenate.")
-        concatenated_df = pd.DataFrame(
-            columns=['ID', 'dataset', 'label_positive_probability', 'junction_aa', 'v_call', 'j_call'])
+        concatenated_df = pd.DataFrame(columns=output_columns)
     else:
         concatenated_df = pd.concat(df_list, ignore_index=True)
+    concatenated_df = concatenated_df.reindex(columns=output_columns).fillna(-999.0)
     submissions_file = os.path.join(out_dir, 'submissions.csv')
     concatenated_df.to_csv(submissions_file, index=False)
     print(f"Concatenated output written to `{submissions_file}`.")
-
-
-def get_dataset_pairs(train_dir: str, test_dir: str) -> List[Tuple[str, List[str]]]:
-    """Returns list of (train_path, [test_paths]) tuples for dataset pairs."""
-    test_groups = defaultdict(list)
-    for test_name in sorted(os.listdir(test_dir)):
-        if test_name.startswith("test_dataset_"):
-            base_id = test_name.replace("test_dataset_", "").split("_")[0]
-            test_groups[base_id].append(os.path.join(test_dir, test_name))
-
-    pairs = []
-    for train_name in sorted(os.listdir(train_dir)):
-        if train_name.startswith("train_dataset_"):
-            train_id = train_name.replace("train_dataset_", "")
-            train_path = os.path.join(train_dir, train_name)
-            pairs.append((train_path, test_groups.get(train_id, [])))
-
-    return pairs
